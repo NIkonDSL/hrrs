@@ -64,27 +64,27 @@ public abstract class HrrsFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
         if (!isRequestRecordable(request)) {
-            chain.doFilter(request, response);
+            filterChain(chain, httpRequest, (HttpServletResponse) response, "Not recordable");
             return;
         }
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpRequestPayload payload = createPayloadUsingFormParameters(httpRequest);
         long time, spendTime;
         if (payload == null) {
             ByteArrayOutputStream requestOutputStream = new ByteArrayOutputStream();
-            TeeServletInputStream teeServletInputStream = new TeeServletInputStream(
+            TeeServletInputStream inputStream = new TeeServletInputStream(
                     httpRequest.getInputStream(),
                     requestOutputStream,
                     getMaxRecordablePayloadByteCount());
-            HttpServletRequest teeRequest = new HrrsHttpServletRequestWrapper(httpRequest, teeServletInputStream);
+            HttpServletRequest wrapper = new HrrsHttpServletRequestWrapper(httpRequest, inputStream);
             time = System.currentTimeMillis();
-            chain.doFilter(teeRequest, response);
+            filterChain(chain, wrapper, (HttpServletResponse) response, (enabled ? "logged, PL" : "PL"));
             spendTime = System.currentTimeMillis() - time;
-            payload = createPayloadUsingInputStream(requestOutputStream, teeServletInputStream);
+            payload = createPayloadUsingInputStream(requestOutputStream, inputStream);
         } else {
             time = System.currentTimeMillis();
-            chain.doFilter(request, response);
+            filterChain(chain, (HttpServletRequest) request, (HttpServletResponse) response, (enabled ? "logged" : ""));
             spendTime = System.currentTimeMillis() - time;
         }
         ResponseInfo responseInfo = new ResponseInfo((HttpServletResponse) response);
@@ -94,6 +94,14 @@ public abstract class HrrsFilter implements Filter {
         if (filteredRecord != null) {
             getWriter().write(record);
         }
+    }
+
+    private void filterChain(FilterChain chain,
+                             HttpServletRequest request,
+                             HttpServletResponse response,
+                             String status) throws IOException, ServletException {
+        chain.doFilter(request, response);
+        response.addHeader("X-HRRS", status);
     }
 
     private boolean isRequestRecordable(ServletRequest request) {
