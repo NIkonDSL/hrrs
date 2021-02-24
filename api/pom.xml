@@ -6,7 +6,7 @@
     <parent>
         <artifactId>hrrs-parent</artifactId>
         <groupId>com.vlkan.hrrs</groupId>
-        <version>0.7-SNAPSHOT</version>
+        <version>0.6.2</version>
         <relativePath>..</relativePath>
     </parent>
 
@@ -27,6 +27,12 @@
         <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>${servlet-api.version}</version>
         </dependency>
 
     </dependencies>

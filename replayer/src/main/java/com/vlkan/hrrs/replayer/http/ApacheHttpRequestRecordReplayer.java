@@ -6,6 +6,7 @@ import com.vlkan.hrrs.api.HttpRequestPayload;
 import com.vlkan.hrrs.api.HttpRequestRecord;
 import com.vlkan.hrrs.replayer.cli.Config;
 import com.vlkan.hrrs.replayer.jtl.JtlPrinter;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpHost;
@@ -84,6 +85,12 @@ public class ApacheHttpRequestRecordReplayer implements HttpRequestRecordReplaye
             return httpResponse.getStatusLine().getStatusCode();
         } catch (SocketTimeoutException error) {
             return HttpStatus.SC_GATEWAY_TIMEOUT;
+        } finally {
+            if (httpUriRequest instanceof HttpPost) {
+                ((HttpPost)httpUriRequest).releaseConnection();
+            } else if (httpUriRequest instanceof HttpGet) {
+                ((HttpGet)httpUriRequest).releaseConnection();
+            }
         }
     }
 

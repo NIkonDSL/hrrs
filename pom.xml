@@ -5,7 +5,7 @@
 
     <groupId>com.vlkan.hrrs</groupId>
     <artifactId>hrrs-parent</artifactId>
-    <version>0.7-SNAPSHOT</version>
+    <version>0.6.2</version>
     <packaging>pom</packaging>
 
     <name>HRRS (HTTP Request Record Suite)</name>

@@ -155,6 +155,11 @@ $ curl http://localhost:8080/hrrs
 $ curl -X PUT http://localhost:8080/hrrs?enabled=true
 ```
 
+It's also available through programmable way:
+```
+HrrsFilter filter = (HrrsFilter) getServletContext().getAttribute(HrrsFilter.SERVLET_CONTEXT_ATTRIBUTE_KEY);
+filter.setEnabled(true);
+```
 After a couple of `GET /hello?name=<name>` queries, let's take a quick look at
 the contents of the Base64-serialized HTTP request records:
 

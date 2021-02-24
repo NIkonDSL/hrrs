@@ -24,14 +24,16 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
 
     private final HttpRequestPayload payload;
 
-    private ImmutableHttpRequestRecord(
-            String id,
-            Date timestamp,
-            String groupName,
-            String uri,
-            HttpRequestMethod method,
-            List<HttpRequestHeader> headers,
-            HttpRequestPayload payload) {
+    private final ResponseInfo responseInfo;
+
+    private ImmutableHttpRequestRecord(String id,
+                                       Date timestamp,
+                                       String groupName,
+                                       String uri,
+                                       HttpRequestMethod method,
+                                       List<HttpRequestHeader> headers,
+                                       HttpRequestPayload payload,
+                                       ResponseInfo responseInfo) {
         this.id = checkNotNull(id, "id");
         this.timestamp = checkNotNull(timestamp, "timestamp");
         this.groupName = checkNotNull(groupName, "groupName");
@@ -39,6 +41,7 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
         this.method = checkNotNull(method, "method");
         this.headers = checkNotNull(headers, "headers");
         this.payload = checkNotNull(payload, "payload");
+        this.responseInfo = responseInfo;
     }
 
     @Override
@@ -77,6 +80,11 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
     }
 
     @Override
+    public ResponseInfo getResponseInfo() {
+        return responseInfo;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
@@ -99,6 +107,7 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
     public String toString() {
         return MoreObjects
                 .toStringHelper(this)
+                .omitNullValues()
                 .add("id", id)
                 .add("timestamp", timestamp)
                 .add("groupName", groupName)
@@ -106,6 +115,7 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
                 .add("method", method)
                 .add("headers", headers)
                 .add("payload", payload)
+                .add("responseInfo", responseInfo)
                 .toString();
     }
 
@@ -127,20 +137,14 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
     }
 
     public static class Builder implements HttpRequestRecord.Builder {
-
         private String id;
-
         private Date timestamp;
-
         private String groupName;
-
         private String uri;
-
         private HttpRequestMethod method;
-
         private List<HttpRequestHeader> headers;
-
         private HttpRequestPayload payload;
+        private ResponseInfo responseInfo;
 
         private Builder() {
             // Do nothing.
@@ -189,8 +193,14 @@ public class ImmutableHttpRequestRecord implements HttpRequestRecord {
         }
 
         @Override
+        public Builder setResponseInfo(ResponseInfo responseInfo) {
+            this.responseInfo = responseInfo;
+            return this;
+        }
+
+        @Override
         public ImmutableHttpRequestRecord build() {
-            return new ImmutableHttpRequestRecord(id, timestamp, groupName, uri, method, headers, payload);
+            return new ImmutableHttpRequestRecord(id, timestamp, groupName, uri, method, headers, payload, responseInfo);
         }
 
     }

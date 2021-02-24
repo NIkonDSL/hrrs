@@ -64,10 +64,19 @@ public class Distiller implements Runnable, Closeable {
                 if (input != output) {
                     changedRecordCount++;
                 }
-                writer.write(output);
+                try {
+                    writer.write(output);
+                } catch (IOException e) {
+                    LOGGER.error("Writer error", e);
+                    break;
+                }
             }
         }
-
+        try {
+            writer.close();
+        } catch (Exception e) {
+            LOGGER.error("Writer error", e);
+        }
         // Report statistics.
         LOGGER.info("totalRecordCount = {}", totalRecordCount);
         String ignoredRecordPercentage = String.format("%.1f%%", (100.0f * ignoredRecordCount / totalRecordCount));

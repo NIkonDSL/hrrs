@@ -7,6 +7,7 @@ import com.vlkan.hrrs.serializer.base64.guava.GuavaBase64Encoder;
 import org.junit.Test;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -24,19 +25,27 @@ public class HttpRequestSerializationTest {
     private static final int MAX_BYTE_COUNT = 1024 * 128;      // 128 KB
 
     @Test
-    public void should_write_and_read() {
+    public void should_write_and_read() throws Exception {
         Random random = new Random(0);
         for (int testIndex = 0; testIndex < RANDOM_RECORD_COUNT; testIndex++) {
+            if (testIndex % 20 == 0){
+                System.out.println("#"+testIndex + "/" + RANDOM_RECORD_COUNT);
+            }
             HttpRequestRecord record = generateHttpRequestRecord(random);
             should_write_and_read(record);
         }
+        System.err.println("ok");
     }
 
-    private static void should_write_and_read(HttpRequestRecord record) {
+    private static void should_write_and_read(HttpRequestRecord record) throws Exception {
         HttpRequestRecordPipe pipe = new HttpRequestRecordPipe(MAX_BYTE_COUNT * 8);
         HttpRequestRecordReader<String> reader = new Base64HttpRequestRecordReader(pipe, GuavaBase64Decoder.getInstance());
-        HttpRequestRecordWriter<String> writer = new Base64HttpRequestRecordWriter(pipe, GuavaBase64Encoder.getInstance());
+        HttpRequestRecordWriter<String> writer = Base64HttpRequestRecordWriter.createBase64HttpRequestRecordWriter(pipe, GuavaBase64Encoder.getInstance());
         writer.write(record);
+
+        while (!writer.isReady()) {
+            TimeUnit.MILLISECONDS.sleep(100);
+        }
         pipe.flush();
         Iterator<HttpRequestRecord> iterator = reader.read().iterator();
         assertThat(iterator.hasNext(), is(true));
@@ -55,6 +64,7 @@ public class HttpRequestSerializationTest {
         HttpRequestMethod method = generateHttpRequestMethod(random);
         List<HttpRequestHeader> headers = generateHttpRequestHeaders(random);
         HttpRequestPayload payload = generateHttpRequestPayload(random);
+        ResponseInfo responseInfo = new ResponseInfo(null);
 
         // Create the record.
         return ImmutableHttpRequestRecord
@@ -66,6 +76,7 @@ public class HttpRequestSerializationTest {
                 .setMethod(method)
                 .setHeaders(headers)
                 .setPayload(payload)
+                .setResponseInfo(responseInfo)
                 .build();
 
     }

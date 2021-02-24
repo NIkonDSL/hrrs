@@ -34,7 +34,7 @@ public class Base64DistillerModule extends DistillerModule {
         URI outputUri = config.getOutputUri();
         File outputFile = new File(outputUri);
         HttpRequestRecordWriterFileTarget writerTarget = new HttpRequestRecordWriterFileTarget(outputFile, Base64HttpRequestRecord.CHARSET);
-        return new Base64HttpRequestRecordWriter(writerTarget, GuavaBase64Encoder.getInstance());
+        return Base64HttpRequestRecordWriter.createBase64HttpRequestRecordWriter(writerTarget, GuavaBase64Encoder.getInstance());
     }
 
 }

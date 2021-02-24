@@ -19,6 +19,8 @@ public interface HttpRequestRecord {
 
     HttpRequestPayload getPayload();
 
+    ResponseInfo getResponseInfo();
+
     Builder toBuilder();
 
     interface Builder {
@@ -36,6 +38,8 @@ public interface HttpRequestRecord {
         Builder setHeaders(List<HttpRequestHeader> headers);
 
         Builder setPayload(HttpRequestPayload payload);
+
+        Builder setResponseInfo(ResponseInfo responseInfo);
 
         HttpRequestRecord build();
 

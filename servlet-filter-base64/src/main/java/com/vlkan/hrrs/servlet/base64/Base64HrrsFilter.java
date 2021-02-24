@@ -11,8 +11,6 @@ import com.vlkan.rfos.RotationConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class Base64HrrsFilter extends HrrsFilter {
@@ -26,7 +24,7 @@ public class Base64HrrsFilter extends HrrsFilter {
     public Base64HrrsFilter(RotationConfig rotationConfig) {
         checkNotNull(rotationConfig, "rotationConfig");
         this.writerTarget = new HttpRequestRecordWriterRotatingFileTarget(rotationConfig, Base64HttpRequestRecord.CHARSET);
-        this.writer = new Base64HttpRequestRecordWriter(writerTarget, GuavaBase64Encoder.getInstance());
+        this.writer = Base64HttpRequestRecordWriter.createBase64HttpRequestRecordWriter(writerTarget, GuavaBase64Encoder.getInstance());
     }
 
     public HttpRequestRecordWriterTarget<String> getWriterTarget() {
@@ -41,8 +39,9 @@ public class Base64HrrsFilter extends HrrsFilter {
     @Override
     public void destroy() {
         try {
+            writer.close();
             writerTarget.close();
-        } catch (IOException error) {
+        } catch (Exception error) {
             LOGGER.error("failed closing writer", error);
         }
     }

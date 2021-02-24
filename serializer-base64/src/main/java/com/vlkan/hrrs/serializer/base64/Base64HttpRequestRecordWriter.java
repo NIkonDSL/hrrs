@@ -37,6 +37,7 @@ public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<St
 
     @Override
     public void write(HttpRequestRecord record) throws IOException {
+        //get out of sync code
         try {
             String formattedDate = dateFormat.format(record.getTimestamp());
             StringBuilder toBeRecorded = new StringBuilder(512);
@@ -52,6 +53,10 @@ public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<St
                     .append(record.getMethod().toString())
                     .append(FIELD_SEPARATOR)
                     .append(encodedRecordBytes)
+                    .append(FIELD_SEPARATOR)
+                    .append(record.getResponseInfo().getStatusCode())
+                    .append(FIELD_SEPARATOR)
+                    .append(record.getResponseInfo().getResponseTime())
                     .append(RECORD_SEPARATOR);
             synchronized (this) {
                 target.write(toBeRecorded.toString());
@@ -60,6 +65,16 @@ public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<St
             String message = String.format("record serialization failure (id=%s)", record.getId());
             throw new RuntimeException(message, error);
         }
+    }
+
+    @Override
+    public void close() throws InterruptedException {
+
+    }
+
+    @Override
+    public boolean isReady() throws InterruptedException {
+        return true;
     }
 
     private byte[] writeRecord(HttpRequestRecord record) throws IOException {

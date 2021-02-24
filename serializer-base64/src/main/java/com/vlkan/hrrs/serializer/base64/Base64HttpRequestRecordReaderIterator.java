@@ -6,22 +6,21 @@ import javax.annotation.concurrent.NotThreadSafe;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.vlkan.hrrs.serializer.base64.Base64HttpRequestRecord.DATE_FORMAT;
 import static com.vlkan.hrrs.serializer.base64.Base64HttpRequestRecord.FIELD_SEPARATOR;
 
 @NotThreadSafe
 public class Base64HttpRequestRecordReaderIterator implements Iterator<HttpRequestRecord> {
 
     private final HttpRequestRecordReaderSource<String> source;
-
     private final Base64Decoder decoder;
-
+    private final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss.SSSZ");
     private long lineIndex = -1;
-
     private String line;
 
     Base64HttpRequestRecordReaderIterator(HttpRequestRecordReaderSource<String> source, Base64Decoder decoder) {
@@ -43,16 +42,16 @@ public class Base64HttpRequestRecordReaderIterator implements Iterator<HttpReque
     public HttpRequestRecord next() {
         checkArgument(lineIndex >= 0, "hasNext() should have been called first");
         try {
-            String[] fields = line.split(FIELD_SEPARATOR, 5);
-            checkArgument(fields.length == 5, "insufficient field count (fieldCount=%s)", fields.length);
+            String[] fields = line.split(FIELD_SEPARATOR, 6);
+            checkArgument(fields.length >= 5, "insufficient field count (at least 5) but was %s", fields.length);
             String id = fields[0];
-            Date timestamp = DATE_FORMAT.parse(fields[1]);
+            Date timestamp = dateFormat.parse(fields[1]);
             String groupName = fields[2];
             HttpRequestMethod method = HttpRequestMethod.valueOf(fields[3]);
             String encodedRecordBytes = fields[4];
             byte[] recordBytes = decoder.decode(encodedRecordBytes);
             return readRecord(id, timestamp, groupName, method, recordBytes);
-        } catch (Throwable error) {
+        } catch (Exception error) {
             String message = String.format("failed parsing record (lineIndex=%d)", lineIndex);
             throw new RuntimeException(message, error);
         }
@@ -81,6 +80,7 @@ public class Base64HttpRequestRecordReaderIterator implements Iterator<HttpReque
                 .setMethod(method)
                 .setHeaders(headers)
                 .setPayload(payload)
+                .setResponseInfo(null)
                 .build();
 
     }

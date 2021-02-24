@@ -9,6 +9,7 @@ import com.vlkan.hrrs.api.HttpRequestRecordWriterTarget;
 import com.vlkan.hrrs.api.ImmutableHttpRequestHeader;
 import com.vlkan.hrrs.api.ImmutableHttpRequestPayload;
 import com.vlkan.hrrs.api.ImmutableHttpRequestRecord;
+import com.vlkan.hrrs.api.ResponseInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +22,7 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -62,28 +64,35 @@ public abstract class HrrsFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        if (isRequestRecordable(request)) {
-            HttpServletRequest httpRequest = (HttpServletRequest) request;
-            HttpRequestPayload payload = createPayloadUsingFormParameters(httpRequest);
-            if (payload == null) {
-                ByteArrayOutputStream requestOutputStream = new ByteArrayOutputStream();
-                TeeServletInputStream teeServletInputStream = new TeeServletInputStream(
-                        httpRequest.getInputStream(),
-                        requestOutputStream,
-                        getMaxRecordablePayloadByteCount());
-                HttpServletRequest teeRequest = new HrrsHttpServletRequestWrapper(httpRequest, teeServletInputStream);
-                chain.doFilter(teeRequest, response);
-                payload = createPayloadUsingInputStream(requestOutputStream, teeServletInputStream);
-            } else {
-                chain.doFilter(request, response);
-            }
-            HttpRequestRecord record = createRecord(httpRequest, payload);
-            HttpRequestRecord filteredRecord = filterRecord(record);
-            if (filteredRecord != null) {
-                getWriter().write(record);
-            }
-        } else {
+        if (!isRequestRecordable(request)) {
             chain.doFilter(request, response);
+            return;
+        }
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpRequestPayload payload = createPayloadUsingFormParameters(httpRequest);
+        long time, spendTime;
+        if (payload == null) {
+            ByteArrayOutputStream requestOutputStream = new ByteArrayOutputStream();
+            TeeServletInputStream teeServletInputStream = new TeeServletInputStream(
+                    httpRequest.getInputStream(),
+                    requestOutputStream,
+                    getMaxRecordablePayloadByteCount());
+            HttpServletRequest teeRequest = new HrrsHttpServletRequestWrapper(httpRequest, teeServletInputStream);
+            time = System.currentTimeMillis();
+            chain.doFilter(teeRequest, response);
+            spendTime = System.currentTimeMillis() - time;
+            payload = createPayloadUsingInputStream(requestOutputStream, teeServletInputStream);
+        } else {
+            time = System.currentTimeMillis();
+            chain.doFilter(request, response);
+            spendTime = System.currentTimeMillis() - time;
+        }
+        ResponseInfo responseInfo = new ResponseInfo((HttpServletResponse) response);
+        responseInfo.setResponseTime(spendTime);
+        HttpRequestRecord record = createRecord(httpRequest, responseInfo, payload);
+        HttpRequestRecord filteredRecord = filterRecord(record);
+        if (filteredRecord != null) {
+            getWriter().write(record);
         }
     }
 
@@ -107,7 +116,7 @@ public abstract class HrrsFilter implements Filter {
         LOGGER.trace("switched state (enabled={})", enabled);
     }
 
-    private HttpRequestRecord createRecord(HttpServletRequest request, HttpRequestPayload payload) {
+    private HttpRequestRecord createRecord(HttpServletRequest request, ResponseInfo responseInfo, HttpRequestPayload payload) {
         String id = createRequestId(request);
         Date timestamp = new Date();
         String groupName = createRequestGroupName(request);
@@ -123,6 +132,7 @@ public abstract class HrrsFilter implements Filter {
                 .setMethod(method)
                 .setHeaders(headers)
                 .setPayload(payload)
+                .setResponseInfo(responseInfo)
                 .build();
     }
 
