@@ -5,6 +5,8 @@ import com.vlkan.hrrs.api.*;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -12,13 +14,20 @@ import static com.vlkan.hrrs.serializer.base64.Base64HttpRequestRecord.*;
 
 public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<String> {
 
-    private final Base64Encoder encoder;
+    protected final Base64Encoder encoder;
+    protected final HttpRequestRecordWriterTarget<String> target;
+    private final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss.SSSZ");
 
-    private final HttpRequestRecordWriterTarget<String> target;
-
-    public Base64HttpRequestRecordWriter(HttpRequestRecordWriterTarget<String> target, Base64Encoder encoder) {
+    protected Base64HttpRequestRecordWriter(HttpRequestRecordWriterTarget<String> target, Base64Encoder encoder) {
         this.target = checkNotNull(target, "target");
         this.encoder = checkNotNull(encoder, "encoder");
+    }
+
+    public static Base64HttpRequestRecordWriter createBase64HttpRequestRecordWriter(HttpRequestRecordWriterTarget<String> target, Base64Encoder encoder) {
+        if (System.getProperty("use.hrrs.queue") != null) {
+            return new QueueBase64HttpRequestRecordWriter(target, encoder);
+        }
+        return new Base64HttpRequestRecordWriter(target, encoder);
     }
 
     @Override
@@ -27,23 +36,27 @@ public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<St
     }
 
     @Override
-    public void write(HttpRequestRecord record) {
+    public void write(HttpRequestRecord record) throws IOException {
         try {
+            String formattedDate = dateFormat.format(record.getTimestamp());
+            StringBuilder toBeRecorded = new StringBuilder(512);
+            byte[] recordBytes = writeRecord(record);
+            String encodedRecordBytes = encoder.encode(recordBytes);
+            toBeRecorded
+                    .append(record.getId())
+                    .append(FIELD_SEPARATOR)
+                    .append(formattedDate)
+                    .append(FIELD_SEPARATOR)
+                    .append(record.getGroupName())
+                    .append(FIELD_SEPARATOR)
+                    .append(record.getMethod().toString())
+                    .append(FIELD_SEPARATOR)
+                    .append(encodedRecordBytes)
+                    .append(RECORD_SEPARATOR);
             synchronized (this) {
-                target.write(record.getId());
-                target.write(FIELD_SEPARATOR);
-                target.write(DATE_FORMAT.format(record.getTimestamp()));
-                target.write(FIELD_SEPARATOR);
-                target.write(record.getGroupName());
-                target.write(FIELD_SEPARATOR);
-                target.write(record.getMethod().toString());
-                target.write(FIELD_SEPARATOR);
-                byte[] recordBytes = writeRecord(record);
-                String encodedRecordBytes = encoder.encode(recordBytes);
-                target.write(encodedRecordBytes);
-                target.write(RECORD_SEPARATOR);
+                target.write(toBeRecorded.toString());
             }
-        } catch (Throwable error) {
+        } catch (Exception error) {
             String message = String.format("record serialization failure (id=%s)", record.getId());
             throw new RuntimeException(message, error);
         }
