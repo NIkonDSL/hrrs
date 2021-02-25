@@ -24,10 +24,10 @@ public class Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<St
     }
 
     public static Base64HttpRequestRecordWriter createBase64HttpRequestRecordWriter(HttpRequestRecordWriterTarget<String> target, Base64Encoder encoder) {
-        if (System.getProperty("use.hrrs.queue") != null) {
-            return new QueueBase64HttpRequestRecordWriter(target, encoder);
+        if (System.getProperty("use.hrrs.vanilla") != null) {
+            return new Base64HttpRequestRecordWriter(target, encoder);
         }
-        return new Base64HttpRequestRecordWriter(target, encoder);
+        return new QueueBase64HttpRequestRecordWriter(target, encoder);
     }
 
     @Override

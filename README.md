@@ -500,6 +500,13 @@ to the command line arguments is generally a good idea. Note that, you don't
 want to have such a level of verbosity while executing the actual performance
 tests.
 
+# Vanilla writer &amp; queue based fasy writer
+
+Sometines it's better not to spend time on processing BASE64 conversation while 
+writing to a disc. That's why queue writer was implemented. In order to use old 
+one (vanilla writer) please add -Duse.hrrs.vanilla=true. New writer will add the 
+header 'X-HRRS-Queue' to see queue usage.
+
 <a name="faq"></a>
 
 # F.A.Q.

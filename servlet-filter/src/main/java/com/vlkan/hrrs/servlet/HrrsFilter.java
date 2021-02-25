@@ -10,6 +10,7 @@ import com.vlkan.hrrs.api.ImmutableHttpRequestHeader;
 import com.vlkan.hrrs.api.ImmutableHttpRequestPayload;
 import com.vlkan.hrrs.api.ImmutableHttpRequestRecord;
 import com.vlkan.hrrs.api.ResponseInfo;
+import com.vlkan.hrrs.serializer.base64.QueueBase64HttpRequestRecordWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +103,7 @@ public abstract class HrrsFilter implements Filter {
                              String status) throws IOException, ServletException {
         chain.doFilter(request, response);
         response.addHeader("X-HRRS", status);
+        response.addHeader("X-HRRS-Queue", QueueBase64HttpRequestRecordWriter.getStat());
     }
 
     private boolean isRequestRecordable(ServletRequest request) {

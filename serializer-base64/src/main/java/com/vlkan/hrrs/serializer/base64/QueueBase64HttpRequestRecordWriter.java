@@ -19,33 +19,44 @@ import static com.vlkan.hrrs.serializer.base64.Base64HttpRequestRecord.*;
 
 public class QueueBase64HttpRequestRecordWriter extends Base64HttpRequestRecordWriter implements HttpRequestRecordWriter<String> {
     private static final Logger LOGGER = LoggerFactory.getLogger(QueueBase64HttpRequestRecordWriter.class);
+    private static final String ENCODED_DATA_PLACEHOLDER = "<!--ENCODED_DATA-->";
     private final DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmmss.SSSZ");
     private static volatile boolean stop = false;
     private static CountDownLatch stopped = new CountDownLatch(1);
     private static CountDownLatch started = new CountDownLatch(1);
     private long lastFlush = System.currentTimeMillis();
-    private static volatile DoWithRecord doWiRecord = null;
-    private static BlockingQueue<String> queue = new ArrayBlockingQueue<>(1000);
+    private static volatile DoWithRecord doWithRecord = null;
+    private static final int CAPACITY = 1000;
+    private static BlockingQueue<ToBeRecorded> queue = new ArrayBlockingQueue<>(CAPACITY);
+
+    private static class ToBeRecorded {
+        String content;
+        byte[] binaryData;
+
+        public ToBeRecorded(String content) {
+            this.content = content;
+        }
+    }
 
     private interface DoWithRecord {
-        void apply(String record) throws Exception;
+        void apply(ToBeRecorded record) throws Exception;
     }
 
     private static Thread writer = new Thread(() -> {
         started.countDown();
         while (!stop || !queue.isEmpty()) {
             try {
-                String toBeRecorded = queue.poll(50, TimeUnit.MILLISECONDS);
+                ToBeRecorded toBeRecorded = queue.poll(50, TimeUnit.MILLISECONDS);
                 if (toBeRecorded == null) {
                     continue;
                 }
-                if (toBeRecorded.isEmpty()) {
+                if (toBeRecorded.content.isEmpty()) {
                     //stop signal detected
                     LOGGER.info("Stop signal detected");
                     break;
                 }
                 try {
-                    doWiRecord.apply(toBeRecorded);
+                    doWithRecord.apply(toBeRecorded);
                 } catch (Exception error) {
                     String message = String.format("record serialization failure (id=%s)", toBeRecorded);
                     throw new RuntimeException(message, error);
@@ -70,8 +81,11 @@ public class QueueBase64HttpRequestRecordWriter extends Base64HttpRequestRecordW
     public QueueBase64HttpRequestRecordWriter(HttpRequestRecordWriterTarget<String> target, Base64Encoder encoder) {
         super(target, encoder);
         //stop signal detected
-        QueueBase64HttpRequestRecordWriter.doWiRecord = record -> {
-            target.write(record);
+        QueueBase64HttpRequestRecordWriter.doWithRecord = record -> {
+            String content = record.content;
+            String encodedRecordBytes = encoder.encode(record.binaryData);
+            content = content.replace(ENCODED_DATA_PLACEHOLDER, encodedRecordBytes);
+            target.write(content);
             if (queue.isEmpty() || (System.currentTimeMillis() - lastFlush > 10000)) {
                 target.flush();
             }
@@ -96,7 +110,7 @@ public class QueueBase64HttpRequestRecordWriter extends Base64HttpRequestRecordW
         String formattedDate = dateFormat.format(record.getTimestamp());
         StringBuilder toBeRecorded = new StringBuilder(512);
         byte[] recordBytes = writeRecord(record);
-        String encodedRecordBytes = encoder.encode(recordBytes);
+
         toBeRecorded
                 .append(record.getId())
                 .append(FIELD_SEPARATOR)
@@ -106,13 +120,15 @@ public class QueueBase64HttpRequestRecordWriter extends Base64HttpRequestRecordW
                 .append(FIELD_SEPARATOR)
                 .append(record.getMethod().toString())
                 .append(FIELD_SEPARATOR)
-                .append(encodedRecordBytes)
+                .append(ENCODED_DATA_PLACEHOLDER)
                 .append(FIELD_SEPARATOR)
                 .append(record.getResponseInfo().getStatusCode())
                 .append(FIELD_SEPARATOR)
                 .append(record.getResponseInfo().getResponseTime())
                 .append(RECORD_SEPARATOR);
-        if (!queue.offer(toBeRecorded.toString())) {
+        ToBeRecorded toRecord = new ToBeRecorded(toBeRecorded.toString());
+        toRecord.binaryData = recordBytes;
+        if (!queue.offer(toRecord)) {
             LOGGER.warn("Queue is overflowed. Skipping writing to file...");
         }
     }
@@ -155,7 +171,14 @@ public class QueueBase64HttpRequestRecordWriter extends Base64HttpRequestRecordW
     public void close() throws InterruptedException {
         LOGGER.info("Stopping...");
         stop = true;
-        queue.put("");
+        queue.put(new ToBeRecorded(""));
         stopped.await();
+    }
+
+    public static String getStat() {
+        int size = queue.size();
+        return "Writer queue: " + size + "/" + CAPACITY + " (" +
+                (int) (size * 100.0 / CAPACITY)
+                + "%)";
     }
 }
